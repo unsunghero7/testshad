@@ -1,101 +1,197 @@
+import React from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Bell, Search, MapPin, Home, Utensils, User } from "lucide-react";
 import Image from "next/image";
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+const promotions = [
+  {
+    id: 1,
+    title: "50% Off Pizzas",
+    image: "/placeholder.svg?height=100&width=200",
+  },
+  {
+    id: 2,
+    title: "Free Delivery",
+    image: "/placeholder.svg?height=100&width=200",
+  },
+  {
+    id: 3,
+    title: "Buy 1 Get 1 Free",
+    image: "/placeholder.svg?height=100&width=200",
+  },
+  {
+    id: 4,
+    title: "20% Off First Order",
+    image: "/placeholder.svg?height=100&width=200",
+  },
+];
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+const branches = [
+  {
+    id: 1,
+    name: "Downtown Branch",
+    image: "/placeholder.svg?height=100&width=200",
+    distance: "0.5 miles",
+    status: "Open",
+  },
+  {
+    id: 2,
+    name: "Uptown Branch",
+    image: "/placeholder.svg?height=100&width=200",
+    distance: "1.2 miles",
+    status: "Busy",
+  },
+  {
+    id: 3,
+    name: "Riverside Branch",
+    image: "/placeholder.svg?height=100&width=200",
+    distance: "2.0 miles",
+    status: "Closed",
+  },
+];
+
+export default function MobileHomePage() {
+  return (
+    <div className="flex flex-col min-h-screen w-full max-w-md mx-auto bg-background text-foreground">
+      {/* Header */}
+      <header className="p-4 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <Avatar>
+            <AvatarImage src="/placeholder.svg?height=40&width=40" alt="User" />
+            <AvatarFallback>JD</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="text-sm text-muted-foreground">Welcome back,</p>
+            <h1 className="text-xl font-semibold">John Doe</h1>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <Button variant="ghost" size="icon">
+          <Bell className="h-6 w-6" />
+        </Button>
+      </header>
+
+      {/* Search Bar */}
+      <div className="px-4 mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-10" placeholder="Search restaurants or dishes" />
+        </div>
+      </div>
+
+      {/* Promotions & Discounts */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold px-4 mb-2">
+          Promotions & Discounts
+        </h2>
+        <ScrollArea className="w-full whitespace-nowrap">
+          <div className="flex w-max space-x-4 p-4">
+            {promotions.map((promo) => (
+              <Card key={promo.id} className="w-[200px] flex-shrink-0">
+                <CardContent className="p-0">
+                  <Image
+                    src={promo.image}
+                    alt={promo.title}
+                    width={200}
+                    height={100}
+                    className="rounded-t-lg"
+                  />
+                  <div className="p-2">
+                    <p className="font-semibold">{promo.title}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </div>
+
+      {/* Delivery or Pickup Toggle */}
+      <div className="px-4 mb-6">
+        <ToggleGroup
+          type="single"
+          defaultValue="delivery"
+          className="justify-center"
         >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <ToggleGroupItem value="delivery" aria-label="Toggle delivery">
+            Delivery
+          </ToggleGroupItem>
+          <ToggleGroupItem value="pickup" aria-label="Toggle pickup">
+            Pickup
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
+      {/* Restaurant Branches */}
+      <div className="flex-1 px-4 mb-20">
+        <h2 className="text-lg font-semibold mb-2">Nearby Branches</h2>
+        <div className="space-y-4">
+          {branches.map((branch) => (
+            <Card key={branch.id} className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="relative h-32">
+                  <Image
+                    src={branch.image}
+                    alt={branch.name}
+                    layout="fill"
+                    objectFit="cover"
+                  />
+                  <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-sm">
+                    {branch.distance}
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-semibold">{branch.name}</h3>
+                    <span
+                      className={`text-sm px-2 py-1 rounded ${
+                        branch.status === "Open"
+                          ? "bg-green-100 text-green-800"
+                          : branch.status === "Busy"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {branch.status}
+                    </span>
+                  </div>
+                  <Button variant="outline" className="w-full">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    View Details
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t max-w-md mx-auto">
+        <div className="flex justify-around p-2">
+          {[
+            { icon: Home, label: "Home" },
+            { icon: Search, label: "Search" },
+            { icon: Utensils, label: "Orders" },
+            { icon: User, label: "Profile" },
+          ].map((item, index) => (
+            <Button
+              key={index}
+              variant="ghost"
+              className="flex-col h-16 px-2"
+              size="sm"
+            >
+              <item.icon className="h-5 w-5 mb-1" />
+              <span className="text-xs">{item.label}</span>
+            </Button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

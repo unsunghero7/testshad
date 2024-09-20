@@ -1,0 +1,306 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  role           UserRole
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  customer       Customer?
+  restaurantAdmin RestaurantAdmin?
+  branchManager   BranchManager?
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  RESTAURANT_ADMIN
+  BRANCH_MANAGER
+  CUSTOMER
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  user            User     @relation(fields: [userId], references: [id])
+  userId          String   @unique
+  name            String
+  phoneNumber     String?
+  addresses       Address[]
+  orders          Order[]
+  reviews         Review[]
+  favorites       Favorite[]
+  wallet          Wallet?
+  loyaltyPoints   Int      @default(0)
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  street      String
+  city        String
+  state       String
+  postalCode  String
+  isDefault   Boolean  @default(false)
+}
+
+model RestaurantAdmin {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @unique
+  restaurant  Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId String
+}
+
+model BranchManager {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @unique
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  branchId    String
+}
+
+model Restaurant {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  logo            String?
+  contactEmail    String
+  contactPhone    String
+  admins          RestaurantAdmin[]
+  branches        Branch[]
+  menu            MenuItem[]
+  addons          Addon[]
+  promotions      Promotion[]
+  reviews         Review[]
+  favorites       Favorite[]
+  coupons         Coupon[]  // Add this line
+}
+
+model Branch {
+  id              String   @id @default(uuid())
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId    String
+  name            String
+  address         String
+  city            String
+  state           String
+  postalCode      String
+  contactPhone    String
+  operatingHours  Json
+  managers        BranchManager[]
+  inventory       Inventory[]
+  orders          Order[]
+}
+
+model MenuItem {
+  id              String   @id @default(uuid())
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId    String
+  name            String
+  description     String?
+  price           Decimal
+  category        String
+  image           String?
+  isAvailable     Boolean  @default(true)
+  addons          MenuItemAddon[]
+  orderItems      OrderItem[]
+}
+
+model Addon {
+  id              String   @id @default(uuid())
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId    String
+  name            String
+  price           Decimal
+  menuItems       MenuItemAddon[]
+}
+
+model MenuItemAddon {
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemId      String
+  addon           Addon    @relation(fields: [addonId], references: [id])
+  addonId         String
+
+  @@id([menuItemId, addonId])
+}
+
+model Inventory {
+  id              String   @id @default(uuid())
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  branchId        String
+  item            String
+  quantity        Int
+  unit            String
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  customer        Customer @relation(fields: [customerId], references: [id])
+  customerId      String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  branchId        String
+  orderItems      OrderItem[]
+  totalAmount     Decimal
+  status          OrderStatus
+  type            OrderType
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  coupon          Coupon?  @relation(fields: [couponId], references: [id])
+  couponId        String?
+  payment         Payment?
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderType {
+  DELIVERY
+  PICKUP
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  order           Order    @relation(fields: [orderId], references: [id])
+  orderId         String
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  menuItemId      String
+  quantity        Int
+  price           Decimal
+  addons          Json?    // Store selected addons as JSON
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  order           Order    @relation(fields: [orderId], references: [id])
+  orderId         String   @unique
+  amount          Decimal
+  method          PaymentMethod
+  status          PaymentStatus
+  transactionId   String?
+  createdAt       DateTime @default(now())
+}
+
+enum PaymentMethod {
+  WALLET
+  CARD
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Wallet {
+  id              String   @id @default(uuid())
+  customer        Customer @relation(fields: [customerId], references: [id])
+  customerId      String   @unique
+  balance         Decimal  @default(0)
+  transactions    WalletTransaction[]
+}
+
+model WalletTransaction {
+  id              String   @id @default(uuid())
+  wallet          Wallet   @relation(fields: [walletId], references: [id])
+  walletId        String
+  amount          Decimal
+  type            TransactionType
+  description     String?
+  createdAt       DateTime @default(now())
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+model Coupon {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  discountType    DiscountType
+  discountValue   Decimal
+  minOrderAmount  Decimal?
+  maxDiscountAmount Decimal?
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean  @default(true)
+  usageLimit      Int?
+  usageCount      Int      @default(0)
+  restaurant      Restaurant? @relation(fields: [restaurantId], references: [id])
+  restaurantId    String?
+  orders          Order[]
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Promotion {
+  id              String   @id @default(uuid())
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId    String
+  title           String
+  description     String
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean  @default(true)
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  customer        Customer @relation(fields: [customerId], references: [id])
+  customerId      String
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId    String
+  rating          Int
+  comment         String?
+  createdAt       DateTime @default(now())
+}
+
+model Favorite {
+  id              String   @id @default(uuid())
+  customer        Customer @relation(fields: [customerId], references: [id])
+  customerId      String
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurantId    String
+
+  @@unique([customerId, restaurantId])
+}
+
+model SystemSettings {
+  id              String   @id @default(uuid())
+  key             String   @unique
+  value           Json
+  updatedAt       DateTime @updatedAt
+}
+
+model ContentPage {
+  id              String   @id @default(uuid())
+  title           String
+  slug            String   @unique
+  content         String
+  isPublished     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
