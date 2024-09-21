@@ -7,55 +7,35 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Bell, Search, MapPin, Home, Utensils, User } from "lucide-react";
 import Image from "next/image";
+import { prisma } from "@/lib/prisma";
 
-const promotions = [
-  {
-    id: 1,
-    title: "50% Off Pizzas",
-    image: "/placeholder.svg?height=100&width=200",
-  },
-  {
-    id: 2,
-    title: "Free Delivery",
-    image: "/placeholder.svg?height=100&width=200",
-  },
-  {
-    id: 3,
-    title: "Buy 1 Get 1 Free",
-    image: "/placeholder.svg?height=100&width=200",
-  },
-  {
-    id: 4,
-    title: "20% Off First Order",
-    image: "/placeholder.svg?height=100&width=200",
-  },
-];
+async function getPromotions() {
+  return await prisma.promotion.findMany({
+    where: { isActive: true },
+    take: 4,
+    orderBy: { startDate: "desc" },
+  });
+}
 
-const branches = [
-  {
-    id: 1,
-    name: "Downtown Branch",
-    image: "/placeholder.svg?height=100&width=200",
-    distance: "0.5 miles",
-    status: "Open",
-  },
-  {
-    id: 2,
-    name: "Uptown Branch",
-    image: "/placeholder.svg?height=100&width=200",
-    distance: "1.2 miles",
-    status: "Busy",
-  },
-  {
-    id: 3,
-    name: "Riverside Branch",
-    image: "/placeholder.svg?height=100&width=200",
-    distance: "2.0 miles",
-    status: "Closed",
-  },
-];
+async function getBranches() {
+  return await prisma.branch.findMany({
+    take: 3,
+    include: { location: true },
+  });
+}
 
-export default function MobileHomePage() {
+async function getCustomer() {
+  // For demo purposes, we'll fetch the first customer
+  return await prisma.customer.findFirst({
+    include: { user: true },
+  });
+}
+
+export default async function MobileHomePage() {
+  const promotions = await getPromotions();
+  const branches = await getBranches();
+  const customer = await getCustomer();
+
   return (
     <div className="flex flex-col min-h-screen w-full max-w-md mx-auto bg-background text-foreground">
       {/* Header */}
@@ -63,11 +43,13 @@ export default function MobileHomePage() {
         <div className="flex items-center space-x-3">
           <Avatar>
             <AvatarImage src="/placeholder.svg?height=40&width=40" alt="User" />
-            <AvatarFallback>JD</AvatarFallback>
+            <AvatarFallback>
+              {customer?.name.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
           <div>
             <p className="text-sm text-muted-foreground">Welcome back,</p>
-            <h1 className="text-xl font-semibold">John Doe</h1>
+            <h1 className="text-xl font-semibold">{customer?.name}</h1>
           </div>
         </div>
         <Button variant="ghost" size="icon">
@@ -94,7 +76,7 @@ export default function MobileHomePage() {
               <Card key={promo.id} className="w-[200px] flex-shrink-0">
                 <CardContent className="p-0">
                   <Image
-                    src={promo.image}
+                    src="/placeholder.svg?height=100&width=200"
                     alt={promo.title}
                     width={200}
                     height={100}
@@ -136,28 +118,22 @@ export default function MobileHomePage() {
               <CardContent className="p-0">
                 <div className="relative h-32">
                   <Image
-                    src={branch.image}
+                    src="/placeholder.svg?height=100&width=200"
                     alt={branch.name}
                     layout="fill"
                     objectFit="cover"
                   />
                   <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-sm">
-                    {branch.distance}
+                    {/* You might want to calculate the distance based on user's location */}
+                    {`${branch.location.city}, ${branch.location.state}`}
                   </div>
                 </div>
                 <div className="p-4">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-semibold">{branch.name}</h3>
-                    <span
-                      className={`text-sm px-2 py-1 rounded ${
-                        branch.status === "Open"
-                          ? "bg-green-100 text-green-800"
-                          : branch.status === "Busy"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {branch.status}
+                    {/* You might want to add a status field to the Branch model */}
+                    <span className="text-sm px-2 py-1 rounded bg-green-100 text-green-800">
+                      Open
                     </span>
                   </div>
                   <Button variant="outline" className="w-full">
