@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,56 +14,84 @@ import {
   Package,
   ChefHat,
 } from "lucide-react";
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 
-async function getOrderData(slug: string, orderId: string) {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      customer: true,
-      branch: {
-        include: {
-          restaurant: {
-            where: { slug },
-          },
-          location: true,
-        },
-      },
-      orderItems: {
-        include: {
-          menuItem: true,
-        },
-      },
-      payment: true,
-    },
-  });
-
-  if (!order || !order.branch.restaurant) {
-    notFound();
-  }
-
-  return order;
+interface Order {
+  id: string;
+  status: OrderStatus;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  customer: {
+    name: string;
+  };
+  branch: {
+    name: string;
+    address: string;
+    contactPhone: string;
+  };
+  orderItems: {
+    id: string;
+    menuItem: {
+      name: string;
+    };
+    quantity: number;
+    price: number;
+  }[];
 }
 
-const orderSteps = [
-  { status: "PENDING", icon: CheckCircle2, label: "Order Confirmed" },
-  { status: "ACCEPTED", icon: ChefHat, label: "Preparing" },
-  { status: "READY_FOR_PICKUP", icon: Package, label: "Ready for Pickup" },
-  { status: "OUT_FOR_DELIVERY", icon: Truck, label: "On the Way" },
-  { status: "DELIVERED", icon: MapPin, label: "Delivered" },
-];
+enum OrderStatus {
+  PENDING = "PENDING",
+  ACCEPTED = "ACCEPTED",
+  PREPARING = "PREPARING",
+  READY_FOR_PICKUP = "READY_FOR_PICKUP",
+  OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED",
+}
 
-export default async function OrderTrackingPage({
-  params,
-}: {
-  params: { slug: string; orderId: string };
-}) {
-  const order = await getOrderData(params.slug, params.orderId);
+const orderStepMap = {
+  [OrderStatus.PENDING]: { icon: Clock, label: "Order Placed" },
+  [OrderStatus.ACCEPTED]: { icon: CheckCircle2, label: "Order Confirmed" },
+  [OrderStatus.PREPARING]: { icon: ChefHat, label: "Preparing" },
+  [OrderStatus.READY_FOR_PICKUP]: { icon: Package, label: "Ready for Pickup" },
+  [OrderStatus.OUT_FOR_DELIVERY]: { icon: Truck, label: "On the Way" },
+  [OrderStatus.DELIVERED]: { icon: MapPin, label: "Delivered" },
+};
 
-  const currentStepIndex = orderSteps.findIndex(
-    (step) => step.status === order.status
-  );
+export default function OrderTrackingPage() {
+  const [order, setOrder] = useState<Order | null>(null);
+  const { slug, orderId } = useParams();
+
+  useEffect(() => {
+    const fetchOrder = async () => {
+      try {
+        const response = await fetch(
+          `/api/restaurant/${slug}/orders/${orderId}`
+        );
+        if (!response.ok) throw new Error("Failed to fetch order");
+        const data = await response.json();
+        setOrder(data);
+      } catch (error) {
+        console.error("Error fetching order:", error);
+      }
+    };
+
+    fetchOrder();
+  }, [slug, orderId]);
+
+  if (!order) return <div>Loading...</div>;
+
+  const orderSteps = Object.entries(orderStepMap).map(([status, step]) => ({
+    ...step,
+    completed:
+      Object.keys(orderStepMap).indexOf(order.status) >=
+      Object.keys(orderStepMap).indexOf(status),
+    time:
+      status === order.status
+        ? new Date(order.updatedAt).toLocaleTimeString()
+        : "",
+  }));
 
   return (
     <div className="flex flex-col min-h-screen w-full max-w-md mx-auto bg-background text-foreground">
@@ -72,8 +100,8 @@ export default async function OrderTrackingPage({
         <Button variant="ghost" size="icon">
           <ArrowLeft className="h-6 w-6" />
         </Button>
-        <h1 className="text-xl font-semibold">Order #{order.id.slice(-6)}</h1>
-        <Badge variant="secondary">{order.status}</Badge>
+        <h1 className="text-xl font-semibold">Order #{order.id.slice(0, 8)}</h1>
+        <Badge variant="secondary">{order.status.replace("_", " ")}</Badge>
       </header>
 
       <div className="flex-1 p-4 space-y-6 pb-20">
@@ -84,13 +112,12 @@ export default async function OrderTrackingPage({
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {new Date(order.updatedAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              {new Date(
+                new Date(order.createdAt).getTime() + 60 * 60 * 1000
+              ).toLocaleTimeString()}
             </div>
             <p className="text-muted-foreground">
-              Your order is {orderSteps[currentStepIndex].label}
+              Your order is {order.status.toLowerCase().replace("_", " ")}!
             </p>
           </CardContent>
         </Card>
@@ -103,18 +130,23 @@ export default async function OrderTrackingPage({
           </div>
         </Card>
 
-        {/* Delivery Person Info */}
+        {/* Restaurant Info */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center">
               <Avatar className="h-12 w-12 mr-4">
-                <AvatarImage src="/placeholder.svg" alt="Delivery Person" />
-                <AvatarFallback>DP</AvatarFallback>
+                <AvatarImage
+                  src="/placeholder.svg?height=50&width=50"
+                  alt="Restaurant"
+                />
+                <AvatarFallback>
+                  {order.branch.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h3 className="font-semibold">Delivery Partner</h3>
+                <h3 className="font-semibold">{order.branch.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Your order will be delivered soon
+                  {order.branch.address}
                 </p>
               </div>
               <Button size="icon" variant="ghost">
@@ -135,7 +167,7 @@ export default async function OrderTrackingPage({
                 <li key={index} className="mb-10 ml-6">
                   <span
                     className={`absolute flex items-center justify-center w-8 h-8 rounded-full -left-4 ring-4 ring-background ${
-                      index <= currentStepIndex
+                      step.completed
                         ? "bg-primary text-primary-foreground"
                         : "bg-muted"
                     }`}
@@ -143,14 +175,7 @@ export default async function OrderTrackingPage({
                     <step.icon className="w-4 h-4" />
                   </span>
                   <h3 className="font-medium leading-tight">{step.label}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {index <= currentStepIndex
-                      ? new Date(order.updatedAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Pending"}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{step.time}</p>
                 </li>
               ))}
             </ol>
@@ -168,13 +193,13 @@ export default async function OrderTrackingPage({
                 <span>
                   {item.quantity}x {item.menuItem.name}
                 </span>
-                <span>${Number(item.price).toFixed(2)}</span>
+                <span>${(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}
             <Separator />
             <div className="flex justify-between items-center font-semibold">
               <span>Total</span>
-              <span>${Number(order.totalAmount).toFixed(2)}</span>
+              <span>${order.totalAmount.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,72 +19,120 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ArrowLeft, Minus, Plus, ChevronRight, Info } from "lucide-react";
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 
-async function getCartData(slug: string) {
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug },
-    include: {
-      branches: true,
-    },
-  });
-
-  if (!restaurant) {
-    notFound();
-  }
-
-  // For this example, we'll assume the first branch. In a real app, you'd select the specific branch.
-  const branchId = restaurant.branches[0].id;
-
-  // Fetch the latest pending order for this restaurant's branch
-  const order = await prisma.order.findFirst({
-    where: {
-      branchId: branchId,
-      status: "PENDING",
-    },
-    include: {
-      orderItems: {
-        include: {
-          menuItem: true,
-        },
-      },
-      coupon: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-
-  return { restaurant, order };
+interface CartItem {
+  id: string;
+  menuItem: {
+    id: string;
+    name: string;
+    price: number;
+  };
+  quantity: number;
+  addons?: {
+    id: string;
+    name: string;
+    price: number;
+  }[];
 }
 
-export default async function MobileCartPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const { restaurant, order } = await getCartData(params.slug);
+interface Coupon {
+  id: string;
+  code: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+}
 
-  if (!order) {
-    // Handle case when there's no pending order
-    return (
-      <div className="flex flex-col min-h-screen w-full max-w-md mx-auto bg-background text-foreground p-4">
-        <h1 className="text-xl font-semibold mb-4">Your Cart</h1>
-        <p>Your cart is empty. Add some items to get started!</p>
-      </div>
-    );
-  }
+export default function MobileCartPage() {
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [deliveryMethod, setDeliveryMethod] = useState("Delivery");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [specialRequest, setSpecialRequest] = useState("");
+  const { slug } = useParams();
 
-  const itemsTotal = order.orderItems.reduce(
-    (sum, item) => sum + Number(item.price) * item.quantity,
-    0
-  );
-  const deliveryCharges = 2.99;
+  useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        const response = await fetch(`/api/restaurant/${slug}/cart`);
+        if (!response.ok) throw new Error("Failed to fetch cart");
+        const data = await response.json();
+        setCartItems(data.items);
+        setDeliveryMethod(data.deliveryMethod);
+        setSpecialRequest(data.specialRequest || "");
+      } catch (error) {
+        console.error("Error fetching cart:", error);
+      }
+    };
+
+    fetchCart();
+  }, [slug]);
+
+  const updateQuantity = async (id: string, change: number) => {
+    try {
+      const response = await fetch(`/api/restaurant/${slug}/cart/items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: change }),
+      });
+      if (!response.ok) throw new Error("Failed to update quantity");
+      const updatedCart = await response.json();
+      setCartItems(updatedCart.items);
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+    }
+  };
+
+  const applyCoupon = async () => {
+    try {
+      const response = await fetch(
+        `/api/restaurant/${slug}/cart/apply-coupon`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: couponCode }),
+        }
+      );
+      if (!response.ok) throw new Error("Failed to apply coupon");
+      const data = await response.json();
+      setAppliedCoupon(data.coupon);
+    } catch (error) {
+      console.error("Error applying coupon:", error);
+    }
+  };
+
+  const updateSpecialRequest = async () => {
+    try {
+      const response = await fetch(
+        `/api/restaurant/${slug}/cart/special-request`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ specialRequest }),
+        }
+      );
+      if (!response.ok) throw new Error("Failed to update special request");
+    } catch (error) {
+      console.error("Error updating special request:", error);
+    }
+  };
+
+  const itemsTotal = cartItems.reduce((sum, item) => {
+    const itemTotal = item.menuItem.price * item.quantity;
+    const addonTotal =
+      item.addons?.reduce((acc, addon) => acc + addon.price, 0) || 0;
+    return sum + itemTotal + addonTotal * item.quantity;
+  }, 0);
+
+  const deliveryCharges = deliveryMethod === "Delivery" ? 2.99 : 0;
   const processingFee = itemsTotal * 0.029 + 0.3;
   const platformFee = 1.99;
   const fulfillmentCharges = deliveryCharges + processingFee + platformFee;
-  const discount = order.coupon ? Number(order.coupon.discountValue) : 0;
+  const discount = appliedCoupon
+    ? appliedCoupon.discountType === "PERCENTAGE"
+      ? itemsTotal * (appliedCoupon.discountValue / 100)
+      : appliedCoupon.discountValue
+    : 0;
   const total = itemsTotal + fulfillmentCharges - discount;
 
   return (
@@ -101,7 +149,7 @@ export default async function MobileCartPage({
       <Dialog>
         <DialogTrigger asChild>
           <Button variant="outline" className="m-4 justify-between">
-            <span>You have selected: {order.type}</span>
+            <span>You have selected: {deliveryMethod}</span>
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
         </DialogTrigger>
@@ -110,10 +158,16 @@ export default async function MobileCartPage({
             <DialogTitle>Choose Delivery Method</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col space-y-4 mt-4">
-            <Button variant={order.type === "DELIVERY" ? "default" : "outline"}>
+            <Button
+              variant={deliveryMethod === "Delivery" ? "default" : "outline"}
+              onClick={() => setDeliveryMethod("Delivery")}
+            >
               Delivery
             </Button>
-            <Button variant={order.type === "PICKUP" ? "default" : "outline"}>
+            <Button
+              variant={deliveryMethod === "Pickup" ? "default" : "outline"}
+              onClick={() => setDeliveryMethod("Pickup")}
+            >
               Pickup
             </Button>
           </div>
@@ -122,25 +176,45 @@ export default async function MobileCartPage({
 
       {/* Cart Items */}
       <div className="flex-1 p-4 space-y-4">
-        {order.orderItems.map((item) => (
+        {cartItems.map((item) => (
           <div key={item.id} className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="font-semibold">{item.menuItem.name}</h3>
               <p className="text-sm text-muted-foreground">
-                ${Number(item.price).toFixed(2)}
+                ${item.menuItem.price.toFixed(2)}
               </p>
+              {item.addons &&
+                item.addons.map((addon) => (
+                  <p key={addon.id} className="text-sm text-muted-foreground">
+                    + {addon.name} (${addon.price.toFixed(2)})
+                  </p>
+                ))}
             </div>
             <div className="flex items-center space-x-2">
-              <Button size="icon" variant="outline">
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => updateQuantity(item.id, -1)}
+              >
                 <Minus className="h-4 w-4" />
               </Button>
               <span className="w-8 text-center">{item.quantity}</span>
-              <Button size="icon" variant="outline">
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => updateQuantity(item.id, 1)}
+              >
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
             <div className="w-20 text-right">
-              ${(Number(item.price) * item.quantity).toFixed(2)}
+              $
+              {(
+                (item.menuItem.price +
+                  (item.addons?.reduce((acc, addon) => acc + addon.price, 0) ||
+                    0)) *
+                item.quantity
+              ).toFixed(2)}
             </div>
           </div>
         ))}
@@ -151,7 +225,9 @@ export default async function MobileCartPage({
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="outline" className="w-full justify-between">
-              Add special request to order
+              {specialRequest
+                ? "Special request"
+                : "Add special request to order"}
               <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
           </DialogTrigger>
@@ -160,12 +236,19 @@ export default async function MobileCartPage({
               <DialogTitle>Special Request</DialogTitle>
             </DialogHeader>
             <Textarea
+              value={specialRequest}
+              onChange={(e) => setSpecialRequest(e.target.value)}
               placeholder="Enter your special request here..."
               className="mt-4"
             />
-            <Button className="mt-4">Save Request</Button>
+            <Button onClick={updateSpecialRequest} className="mt-4">
+              Save Request
+            </Button>
           </DialogContent>
         </Dialog>
+        {specialRequest && (
+          <p className="mt-2 text-sm text-muted-foreground">{specialRequest}</p>
+        )}
       </div>
 
       {/* Coupon Code */}
@@ -174,10 +257,11 @@ export default async function MobileCartPage({
         <div className="flex space-x-2 mt-1">
           <Input
             id="coupon"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value)}
             placeholder="Enter coupon code"
-            value={order.coupon?.code || ""}
           />
-          <Button>Apply</Button>
+          <Button onClick={applyCoupon}>Apply</Button>
         </div>
       </div>
 

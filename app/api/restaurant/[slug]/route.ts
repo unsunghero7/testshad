@@ -28,10 +28,6 @@ export async function GET(
 
     return NextResponse.json(restaurant);
   } catch (error) {
-    console.error("Error fetching restaurant:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch restaurant data" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "An error occurred" }, { status: 500 });
   }
 }

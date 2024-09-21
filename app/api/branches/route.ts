@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
-    const restaurants = await prisma.restaurant.findMany();
-    return NextResponse.json(restaurants);
+    const branches = await prisma.branch.findMany({
+      include: { location: true, restaurant: true },
+    });
+    return NextResponse.json(branches);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to fetch restaurants" },
+      { error: "Failed to fetch branches" },
       { status: 500 }
     );
   }
@@ -16,13 +18,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const restaurant = await prisma.restaurant.create({
+    const branch = await prisma.branch.create({
       data: body,
+      include: { location: true, restaurant: true },
     });
-    return NextResponse.json(restaurant, { status: 201 });
+    return NextResponse.json(branch, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to create restaurant" },
+      { error: "Failed to create branch" },
       { status: 500 }
     );
   }
@@ -32,14 +35,15 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { id, ...data } = body;
-    const restaurant = await prisma.restaurant.update({
+    const branch = await prisma.branch.update({
       where: { id },
       data,
+      include: { location: true, restaurant: true },
     });
-    return NextResponse.json(restaurant);
+    return NextResponse.json(branch);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to update restaurant" },
+      { error: "Failed to update branch" },
       { status: 500 }
     );
   }
@@ -48,13 +52,13 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
-    await prisma.restaurant.delete({
+    await prisma.branch.delete({
       where: { id },
     });
-    return NextResponse.json({ message: "Restaurant deleted successfully" });
+    return NextResponse.json({ message: "Branch deleted successfully" });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to delete restaurant" },
+      { error: "Failed to delete branch" },
       { status: 500 }
     );
   }

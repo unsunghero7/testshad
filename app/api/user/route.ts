@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
-    const restaurants = await prisma.restaurant.findMany();
-    return NextResponse.json(restaurants);
+    const users = await prisma.user.findMany();
+    return NextResponse.json(users);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to fetch restaurants" },
+      { error: "Failed to fetch users" },
       { status: 500 }
     );
   }
@@ -16,13 +16,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const restaurant = await prisma.restaurant.create({
+    const user = await prisma.user.create({
       data: body,
     });
-    return NextResponse.json(restaurant, { status: 201 });
+    return NextResponse.json(user, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to create restaurant" },
+      { error: "Failed to create user" },
       { status: 500 }
     );
   }
@@ -32,14 +32,14 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { id, ...data } = body;
-    const restaurant = await prisma.restaurant.update({
+    const user = await prisma.user.update({
       where: { id },
       data,
     });
-    return NextResponse.json(restaurant);
+    return NextResponse.json(user);
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to update restaurant" },
+      { error: "Failed to update user" },
       { status: 500 }
     );
   }
@@ -48,13 +48,13 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
-    await prisma.restaurant.delete({
+    await prisma.user.delete({
       where: { id },
     });
-    return NextResponse.json({ message: "Restaurant deleted successfully" });
+    return NextResponse.json({ message: "User deleted successfully" });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to delete restaurant" },
+      { error: "Failed to delete user" },
       { status: 500 }
     );
   }

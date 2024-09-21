@@ -1,52 +1,75 @@
-import React from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Bell, Search, MapPin, Home, Utensils, User } from "lucide-react";
 import Image from "next/image";
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-async function getRestaurantData(slug: string) {
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug },
-    include: {
-      branches: {
-        include: {
-          location: true,
-        },
-      },
-      promotions: {
-        where: {
-          isActive: true,
-          endDate: {
-            gte: new Date(),
-          },
-        },
-        orderBy: {
-          startDate: "desc",
-        },
-        take: 4,
-      },
-    },
-  });
-
-  if (!restaurant) {
-    notFound();
-  }
-
-  return restaurant;
+interface Restaurant {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string;
 }
 
-export default async function MobileHomePage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const restaurant = await getRestaurantData(params.slug);
+interface Promotion {
+  id: string;
+  title: string;
+  description: string;
+  restaurantId: string;
+}
+
+interface Branch {
+  id: string;
+  name: string;
+  address: string;
+  contactPhone: string;
+  restaurantId: string;
+}
+
+export default function MobileHomePage() {
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const { slug } = useParams();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch restaurant
+        const restaurantRes = await fetch(`/api/restaurant/${slug}`);
+        if (!restaurantRes.ok) throw new Error("Failed to fetch restaurant");
+        const restaurantData = await restaurantRes.json();
+        setRestaurant(restaurantData);
+
+        // Fetch promotions
+        const promotionsRes = await fetch(
+          `/api/promotions?restaurantId=${restaurantData.id}`
+        );
+        if (!promotionsRes.ok) throw new Error("Failed to fetch promotions");
+        const promotionsData = await promotionsRes.json();
+        setPromotions(promotionsData);
+
+        // Fetch branches
+        const branchesRes = await fetch(
+          `/api/branches?restaurantId=${restaurantData.id}`
+        );
+        if (!branchesRes.ok) throw new Error("Failed to fetch branches");
+        const branchesData = await branchesRes.json();
+        setBranches(branchesData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, [slug]);
+
+  if (!restaurant) return <div>Loading...</div>;
 
   return (
     <div className="flex flex-col min-h-screen w-full max-w-md mx-auto bg-background text-foreground">
@@ -55,7 +78,7 @@ export default async function MobileHomePage({
         <div className="flex items-center space-x-3">
           <Avatar>
             <AvatarImage
-              src={restaurant.logo || "/placeholder.svg"}
+              src={restaurant.logo || "/placeholder.svg?height=40&width=40"}
               alt={restaurant.name}
             />
             <AvatarFallback>
@@ -76,7 +99,7 @@ export default async function MobileHomePage({
       <div className="px-4 mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-10" placeholder="Search menu items" />
+          <Input className="pl-10" placeholder="Search dishes" />
         </div>
       </div>
 
@@ -87,11 +110,11 @@ export default async function MobileHomePage({
         </h2>
         <ScrollArea className="w-full whitespace-nowrap">
           <div className="flex w-max space-x-4 p-4">
-            {restaurant.promotions.map((promo) => (
+            {promotions.map((promo) => (
               <Card key={promo.id} className="w-[200px] flex-shrink-0">
                 <CardContent className="p-0">
                   <Image
-                    src="/placeholder.svg"
+                    src="/placeholder.svg?height=100&width=200"
                     alt={promo.title}
                     width={200}
                     height={100}
@@ -128,27 +151,24 @@ export default async function MobileHomePage({
       <div className="flex-1 px-4 mb-20">
         <h2 className="text-lg font-semibold mb-2">Our Branches</h2>
         <div className="space-y-4">
-          {restaurant.branches.map((branch) => (
+          {branches.map((branch) => (
             <Card key={branch.id} className="overflow-hidden">
               <CardContent className="p-0">
                 <div className="relative h-32">
                   <Image
-                    src="/placeholder.svg"
+                    src="/placeholder.svg?height=100&width=200"
                     alt={branch.name}
                     layout="fill"
                     objectFit="cover"
                   />
-                  <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-sm">
-                    {`${branch.location.city}, ${branch.location.state}`}
-                  </div>
                 </div>
                 <div className="p-4">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="font-semibold">{branch.name}</h3>
-                    <span className="text-sm px-2 py-1 rounded bg-green-100 text-green-800">
-                      Open
-                    </span>
                   </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {branch.address}
+                  </p>
                   <Button variant="outline" className="w-full">
                     <MapPin className="mr-2 h-4 w-4" />
                     View Details

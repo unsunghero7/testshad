@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,79 +13,102 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, CreditCard, Wallet, Smartphone } from "lucide-react";
-import { prisma } from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
+
+interface Order {
+  id: string;
+  totalAmount: number;
+  status: string;
+  type: string;
+  customer: {
+    name: string;
+    addresses: {
+      street: string;
+      city: string;
+      state: string;
+      postalCode: string;
+    }[];
+  };
+}
+
+interface Wallet {
+  id: string;
+  balance: number;
+}
 
 const paymentMethods = [
   { id: "CARD", name: "Credit Card", icon: CreditCard },
   { id: "WALLET", name: "Digital Wallet", icon: Wallet },
-  { id: "CASH", name: "Cash on Delivery", icon: Smartphone },
+  { id: "MOBILE", name: "Mobile Payment", icon: Smartphone },
 ];
 
-async function getPaymentData(slug: string) {
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug },
-    include: {
-      branches: true,
-    },
-  });
+export default function MobilePaymentPage() {
+  const [selectedMethod, setSelectedMethod] = useState("CARD");
+  const [order, setOrder] = useState<Order | null>(null);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { slug } = useParams();
 
-  if (!restaurant) {
-    notFound();
+  useEffect(() => {
+    const fetchOrderAndWallet = async () => {
+      try {
+        setLoading(true);
+        // Fetch current order
+        const orderResponse = await fetch(
+          `/api/restaurant/${slug}/orders/current`
+        );
+        const orderData = await orderResponse.json();
+        setOrder(orderData);
+
+        // Fetch wallet balance
+        const walletResponse = await fetch(`/api/wallets`);
+        const walletData = await walletResponse.json();
+        setWallet(walletData);
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchOrderAndWallet();
+  }, [slug]);
+
+  const handlePayment = async () => {
+    try {
+      const response = await fetch(`/api/restaurant/${slug}/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: order?.id,
+          method: selectedMethod,
+          // Add more payment details as needed
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Payment failed");
+      }
+
+      const result = await response.json();
+      console.log("Payment successful:", result);
+      // Handle successful payment (e.g., show confirmation, redirect to order tracking)
+    } catch (error) {
+      console.error("Payment error:", error);
+      // Handle payment error (e.g., show error message)
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
-
-  // For this example, we'll assume the first branch. In a real app, you'd select the specific branch.
-  const branchId = restaurant.branches[0].id;
-
-  // Fetch the latest pending order for this restaurant's branch
-  const order = await prisma.order.findFirst({
-    where: {
-      branchId: branchId,
-      status: "PENDING",
-    },
-    include: {
-      orderItems: {
-        include: {
-          menuItem: true,
-        },
-      },
-      coupon: true,
-      customer: {
-        include: {
-          addresses: true,
-          wallet: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
 
   if (!order) {
-    notFound();
+    return <div>No active order found.</div>;
   }
-
-  return { restaurant, order };
-}
-
-export default async function MobilePaymentPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const { restaurant, order } = await getPaymentData(params.slug);
-
-  const itemsTotal = order.orderItems.reduce(
-    (sum, item) => sum + Number(item.price) * item.quantity,
-    0
-  );
-  const deliveryCharges = 2.99;
-  const processingFee = itemsTotal * 0.029 + 0.3;
-  const platformFee = 1.99;
-  const fulfillmentCharges = deliveryCharges + processingFee + platformFee;
-  const discount = order.coupon ? Number(order.coupon.discountValue) : 0;
-  const total = itemsTotal + fulfillmentCharges - discount;
 
   return (
     <div className="flex flex-col min-h-screen w-full max-w-md mx-auto bg-background text-foreground">
@@ -101,7 +124,7 @@ export default async function MobilePaymentPage({
         {/* Payment Method Selection */}
         <div>
           <h2 className="text-lg font-semibold mb-2">Select Payment Method</h2>
-          <RadioGroup defaultValue="CARD">
+          <RadioGroup value={selectedMethod} onValueChange={setSelectedMethod}>
             {paymentMethods.map((method) => (
               <div key={method.id} className="flex items-center space-x-2 mb-2">
                 <RadioGroupItem value={method.id} id={method.id} />
@@ -118,31 +141,50 @@ export default async function MobilePaymentPage({
         </div>
 
         {/* Credit Card Details (shown when card is selected) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Card Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cardNumber">Card Number</Label>
-              <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
-            </div>
-            <div className="flex space-x-4">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="expiryDate">Expiry Date</Label>
-                <Input id="expiryDate" placeholder="MM/YY" />
+        {selectedMethod === "CARD" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Card Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cardNumber">Card Number</Label>
+                <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
               </div>
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="cvv">CVV</Label>
-                <Input id="cvv" placeholder="123" />
+              <div className="flex space-x-4">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="expiryDate">Expiry Date</Label>
+                  <Input id="expiryDate" placeholder="MM/YY" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="cvv">CVV</Label>
+                  <Input id="cvv" placeholder="123" />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cardName">Name on Card</Label>
-              <Input id="cardName" placeholder="John Doe" />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="space-y-2">
+                <Label htmlFor="cardName">Name on Card</Label>
+                <Input id="cardName" placeholder="John Doe" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Wallet Balance (shown when wallet is selected) */}
+        {selectedMethod === "WALLET" && wallet && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Wallet Balance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>Current Balance: ${wallet.balance.toFixed(2)}</p>
+              {wallet.balance < order.totalAmount && (
+                <p className="text-red-500 mt-2">
+                  Insufficient balance for this order.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Billing Address */}
         <Card>
@@ -152,27 +194,42 @@ export default async function MobilePaymentPage({
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
-              <Input
-                id="fullName"
-                placeholder="John Doe"
-                defaultValue={order.customer.name}
-              />
+              <Input id="fullName" defaultValue={order.customer.name} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Select defaultValue={order.customer.addresses[0]?.id}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an address" />
-                </SelectTrigger>
-                <SelectContent>
-                  {order.customer.addresses.map((address) => (
-                    <SelectItem key={address.id} value={address.id}>
-                      {`${address.street}, ${address.city}, ${address.state} ${address.postalCode}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {order.customer.addresses[0] && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    defaultValue={order.customer.addresses[0].street}
+                  />
+                </div>
+                <div className="flex space-x-4">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      defaultValue={order.customer.addresses[0].city}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="zipCode">Zip Code</Label>
+                    <Input
+                      id="zipCode"
+                      defaultValue={order.customer.addresses[0].postalCode}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    defaultValue={order.customer.addresses[0].state}
+                  />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -183,23 +240,17 @@ export default async function MobilePaymentPage({
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>${itemsTotal.toFixed(2)}</span>
+              <span>Total Amount</span>
+              <span>${order.totalAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Fulfillment Charges</span>
-              <span>${fulfillmentCharges.toFixed(2)}</span>
+              <span>Order Type</span>
+              <span>{order.type}</span>
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Discount</span>
-                <span>-${discount.toFixed(2)}</span>
-              </div>
-            )}
             <Separator className="my-2" />
             <div className="flex justify-between font-semibold">
               <span>Total</span>
-              <span>${total.toFixed(2)}</span>
+              <span>${order.totalAmount.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>
@@ -207,7 +258,9 @@ export default async function MobilePaymentPage({
 
       {/* Pay Now Button */}
       <div className="p-4 bg-background border-t">
-        <Button className="w-full">Pay ${total.toFixed(2)}</Button>
+        <Button className="w-full" onClick={handlePayment}>
+          Pay ${order.totalAmount.toFixed(2)}
+        </Button>
       </div>
     </div>
   );
